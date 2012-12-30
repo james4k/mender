@@ -1,0 +1,10 @@
+{
+	"assets/script.js": {
+		"pattern": "assets/*.js"
+	},
+	"assets/style.css": {
+		"files": [
+			"assets/one.css"
+		]
+	}
+}
