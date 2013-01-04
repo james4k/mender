@@ -19,31 +19,47 @@ type Spec struct {
 	Pattern string
 }
 
-func Process(file, outputdir string) error {
+func Process(file, vfile, outputdir string) (map[string]string, error) {
 	data, err := ioutil.ReadFile(file)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	specs := make(map[string]Spec)
 	err = json.Unmarshal(data, &specs)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	dir := filepath.Dir(file)
 	os.MkdirAll(outputdir, 0755)
+
+	vmap := make(map[string]string)
 	for name, spec := range specs {
 		spec.Name = name
-		err = ProcessSpec(spec, dir, outputdir)
+		vname, err := ProcessSpec(spec, dir, outputdir)
 		if err != nil {
-			return err
+			return nil, err
 		}
+		vmap[name] = vname
 	}
-	return nil
+
+	vdata, err := json.MarshalIndent(vmap, "", "\t")
+	if err != nil {
+		return nil, err
+	}
+	vf, err := os.Create(vfile)
+	if err != nil {
+		return nil, err
+	}
+	_, err = vf.Write(vdata)
+	if err != nil {
+		return nil, err
+	}
+	return vmap, nil
 }
 
-func ProcessSpec(spec Spec, dir, outputdir string) error {
+func ProcessSpec(spec Spec, dir, outputdir string) (string, error) {
 	if len(spec.Pattern) > 0 {
 		return ProcessGlob(spec.Name, outputdir, filepath.Join(dir, spec.Pattern))
 	} else {
@@ -55,26 +71,30 @@ func ProcessSpec(spec Spec, dir, outputdir string) error {
 	panic("unreachable")
 }
 
-func ProcessGlob(name, outputdir, pattern string) error {
+func ProcessGlob(name, outputdir, pattern string) (string, error) {
 	files, err := filepath.Glob(pattern)
 	if err != nil {
-		return err
+		return "", err
 	}
 	return ProcessFiles(name, outputdir, files...)
 }
 
-func ProcessFiles(name, outputdir string, files ...string) error {
-	buf := bytes.NewBuffer(make([]byte, 0, 2048))
+func ProcessFiles(name, outputdir string, files ...string) (string, error) {
+	buf := bytes.NewBuffer(make([]byte, 0, 1024))
 	hash, err := concatAndHash(buf, files...)
-	outputname := filepath.Join(outputdir, fmt.Sprintf("%s-%x", name, hash))
+	vname := fmt.Sprintf("%s-%x", name, hash)
+	outputname := filepath.Join(outputdir, vname)
 	dir := filepath.Dir(outputname)
 	os.MkdirAll(dir, 0755)
 	f, err := os.Create(outputname)
 	if err != nil {
-		return err
+		return "", err
 	}
 	_, err = io.Copy(f, buf)
-	return err
+	if err != nil {
+		return "", err
+	}
+	return vname, nil
 }
 
 func concatAndHash(dst io.Writer, files ...string) (uint32, error) {

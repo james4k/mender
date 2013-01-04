@@ -8,7 +8,7 @@ import (
 )
 
 var mendFile = flag.String("f", "mend.json", "json file containing mend specs")
-var mendVerionFile = flag.String("o", "mend-versions.json", "output json file with versioning info for each spec to be used by the web app")
+var mendVersionFile = flag.String("o", "mend-versions.json", "output json file with versioning info for each spec to be used by the web app")
 
 func init() {
 	flag.Usage = func() {
@@ -24,7 +24,12 @@ func main() {
 	flag.Parse()
 	log.SetFlags(0)
 
-	err := mender.Process(*mendFile, "_build")
+	outputdir := flag.Arg(0)
+	if outputdir == "" {
+		outputdir = "_build"
+	}
+
+	_, err := mender.Process(*mendFile, *mendVersionFile, outputdir)
 	if err != nil {
 		log.Fatal(err)
 	}
