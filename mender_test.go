@@ -8,16 +8,26 @@ import (
 	"testing"
 )
 
-func TestProcess(t *testing.T) {
+func TestProcessAndVersionMap(t *testing.T) {
 	vmap, err := Process("testdata/mend.json", "testdata/mend-versions.json", "testdata/_build")
 	if err != nil {
 		t.Fatal(err)
 	}
 
+	checkResults(t, vmap)
+	vmap = VersionMap("testdata/mend-versions.json")
+	checkResults(t, vmap)
+
+	err = os.RemoveAll("testdata/_build")
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func checkResults(t *testing.T, vmap map[string]string) {
 	if len(vmap) == 0 {
 		t.Fatal("no versioning info")
 	}
-
 	for k, v := range vmap {
 		actual, err := ioutil.ReadFile(filepath.Join("testdata/_build", v))
 		if err != nil {
@@ -31,10 +41,5 @@ func TestProcess(t *testing.T) {
 		if !bytes.Equal(actual, expected) {
 			t.Fatal("expected did not match actual")
 		}
-	}
-
-	err = os.RemoveAll("testdata/_build")
-	if err != nil {
-		t.Fatal(err)
 	}
 }

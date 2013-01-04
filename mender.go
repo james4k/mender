@@ -82,6 +82,9 @@ func ProcessGlob(name, outputdir, pattern string) (string, error) {
 func ProcessFiles(name, outputdir string, files ...string) (string, error) {
 	buf := bytes.NewBuffer(make([]byte, 0, 1024))
 	hash, err := concatAndHash(buf, files...)
+	if err != nil {
+		return "", err
+	}
 	vname := fmt.Sprintf("%s-%x", name, hash)
 	outputname := filepath.Join(outputdir, vname)
 	dir := filepath.Dir(outputname)
@@ -111,4 +114,17 @@ func concatAndHash(dst io.Writer, files ...string) (uint32, error) {
 		}
 	}
 	return hash.Sum32(), nil
+}
+
+func VersionMap(vfile string) map[string]string {
+	data, err := ioutil.ReadFile(vfile)
+	if err != nil {
+		panic(err)
+	}
+	vmap := make(map[string]string)
+	err = json.Unmarshal(data, &vmap)
+	if err != nil {
+		panic(err)
+	}
+	return vmap
 }
