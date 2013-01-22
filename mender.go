@@ -85,7 +85,8 @@ func ProcessFiles(name, outputdir string, files ...string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	vname := fmt.Sprintf("%s-%x", name, hash)
+	ext := filepath.Ext(name)
+	vname := fmt.Sprintf("%s-%x%s", name[:len(name)-len(ext)], hash, ext)
 	outputname := filepath.Join(outputdir, vname)
 	dir := filepath.Dir(outputname)
 	os.MkdirAll(dir, 0755)
