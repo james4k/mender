@@ -8,8 +8,25 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"path/filepath"
 )
+
+type ProcessorFunc func(out io.Writer, in io.Reader) error
+
+var processors = map[string]ProcessorFunc{
+	"uglifyjs": func(out io.Writer, in io.Reader) error {
+		cmd := exec.Command("uglifyjs")
+		cmd.Stdin = in
+		cmd.Stdout = out
+		return cmd.Run()
+	},
+}
+
+func defaultProcessor(out io.Writer, in io.Reader) error {
+	_, err := io.Copy(out, in)
+	return err
+}
 
 type Spec struct {
 	Name string
@@ -17,6 +34,9 @@ type Spec struct {
 	// if Pattern is non-empty, we glob match instead of using the Files list.
 	Files   []string
 	Pattern string
+
+	// a named processor; currently only supports uglifyjs
+	Processor string
 }
 
 func Process(file, vfile, outputdir string) (map[string]string, error) {
@@ -61,25 +81,25 @@ func Process(file, vfile, outputdir string) (map[string]string, error) {
 
 func ProcessSpec(spec Spec, dir, outputdir string) (string, error) {
 	if len(spec.Pattern) > 0 {
-		return ProcessGlob(spec.Name, outputdir, filepath.Join(dir, spec.Pattern))
+		return ProcessGlob(spec.Name, outputdir, processors[spec.Processor], filepath.Join(dir, spec.Pattern))
 	} else {
 		for i, f := range spec.Files {
 			spec.Files[i] = filepath.Join(dir, f)
 		}
-		return ProcessFiles(spec.Name, outputdir, spec.Files...)
+		return ProcessFiles(spec.Name, outputdir, processors[spec.Processor], spec.Files...)
 	}
 	panic("unreachable")
 }
 
-func ProcessGlob(name, outputdir, pattern string) (string, error) {
+func ProcessGlob(name, outputdir string, processor ProcessorFunc, pattern string) (string, error) {
 	files, err := filepath.Glob(pattern)
 	if err != nil {
 		return "", err
 	}
-	return ProcessFiles(name, outputdir, files...)
+	return ProcessFiles(name, outputdir, processor, files...)
 }
 
-func ProcessFiles(name, outputdir string, files ...string) (string, error) {
+func ProcessFiles(name, outputdir string, processor ProcessorFunc, files ...string) (string, error) {
 	buf := bytes.NewBuffer(make([]byte, 0, 1024))
 	hash, err := concatAndHash(buf, files...)
 	if err != nil {
@@ -94,7 +114,10 @@ func ProcessFiles(name, outputdir string, files ...string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	_, err = io.Copy(f, buf)
+	if processor == nil {
+		processor = defaultProcessor
+	}
+	err = processor(f, buf)
 	if err != nil {
 		return "", err
 	}
