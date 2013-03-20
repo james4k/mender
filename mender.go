@@ -19,6 +19,7 @@ var processors = map[string]ProcessorFunc{
 		cmd := exec.Command("uglifyjs")
 		cmd.Stdin = in
 		cmd.Stdout = out
+		cmd.Stderr = os.Stderr
 		return cmd.Run()
 	},
 }
