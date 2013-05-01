@@ -40,12 +40,12 @@ type Spec struct {
 	Processor string
 }
 
-func ReadSpecs(file string) (map[string]Spec, error) {
+func ReadSpecs(file string) (map[string]*Spec, error) {
 	data, err := ioutil.ReadFile(file)
 	if err != nil {
 		return nil, err
 	}
-	specs := make(map[string]Spec)
+	specs := make(map[string]*Spec)
 	err = json.Unmarshal(data, &specs)
 	if err != nil {
 		return nil, err
@@ -88,7 +88,7 @@ func Process(file, vfile, outputdir string) (map[string]string, error) {
 	return vmap, nil
 }
 
-func ProcessSpec(spec Spec, dir, outputdir string) (string, error) {
+func ProcessSpec(spec *Spec, dir, outputdir string) (string, error) {
 	if len(spec.Pattern) > 0 {
 		return ProcessGlob(spec.Name, outputdir, processors[spec.Processor], filepath.Join(dir, spec.Pattern))
 	} else {
