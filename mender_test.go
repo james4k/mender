@@ -8,8 +8,8 @@ import (
 	"testing"
 )
 
-func TestProcessAndVersionMap(t *testing.T) {
-	vmap, err := Process("testdata/mend.json", "testdata/mend-versions.json", "testdata/_build")
+func TestBuildAndVersionMap(t *testing.T) {
+	vmap, err := Build("testdata/mend.json", "testdata/mend-versions.json", "testdata/_build", os.Stderr)
 	if err != nil {
 		t.Fatal(err)
 	}

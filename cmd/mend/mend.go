@@ -29,7 +29,7 @@ func main() {
 		outputdir = "_build"
 	}
 
-	_, err := mender.Process(*mendFile, *mendVersionFile, outputdir)
+	_, err := mender.Build(*mendFile, *mendVersionFile, outputdir)
 	if err != nil {
 		log.Fatal(err)
 	}
