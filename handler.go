@@ -39,11 +39,13 @@ func LiveServer(specfile, dir string, fallback http.Handler, stderr io.Writer) *
 		stderr:   stderr,
 		logger:   log.New(stderr, "", log.LstdFlags),
 	}
-	h.mend()
-	go h.watch()
-	time.AfterFunc(time.Second/10, func() {
-		h.OnChange()
-	})
+	go func() {
+		h.mend()
+		time.AfterFunc(time.Second/5, func() {
+			h.OnChange()
+		})
+		h.watch()
+	}()
 	return h
 }
 
