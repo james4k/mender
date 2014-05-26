@@ -159,7 +159,7 @@ func ReadSpecs(file string) (map[string]*Spec, error) {
 }
 
 // Build processes each spec and writes to disk the built files and version spec file.
-func Build(file, vfile, outputdir string, stderr io.Writer) (map[string]string, error) {
+func Build(file, vfile, outputdir string, errw io.Writer) (map[string]string, error) {
 	specs, err := ReadSpecs(file)
 	if err != nil {
 		return nil, err
@@ -169,7 +169,7 @@ func Build(file, vfile, outputdir string, stderr io.Writer) (map[string]string, 
 
 	vmap := make(map[string]string)
 	for name, spec := range specs {
-		vname, data, err := ProcessSpec(spec, dir, stderr)
+		vname, data, err := ProcessSpec(spec, dir, errw)
 		if err != nil {
 			return nil, err
 		}
@@ -200,27 +200,27 @@ func Build(file, vfile, outputdir string, stderr io.Writer) (map[string]string, 
 	return vmap, nil
 }
 
-func ProcessSpec(spec *Spec, dir string, stderr io.Writer) (string, []byte, error) {
+func ProcessSpec(spec *Spec, dir string, errw io.Writer) (string, []byte, error) {
 	if len(spec.Pattern) > 0 {
-		return ProcessGlob(spec.Name, composeProcessors(spec.Processors), stderr, filepath.Join(dir, spec.Pattern))
+		return ProcessGlob(spec.Name, composeProcessors(spec.Processors), errw, filepath.Join(dir, spec.Pattern))
 	} else {
 		for i, f := range spec.Files {
 			spec.Files[i] = filepath.Join(dir, f)
 		}
-		return ProcessFiles(spec.Name, composeProcessors(spec.Processors), stderr, spec.Files...)
+		return ProcessFiles(spec.Name, composeProcessors(spec.Processors), errw, spec.Files...)
 	}
 	panic("unreachable")
 }
 
-func ProcessGlob(name string, processor ProcessorFunc, stderr io.Writer, pattern string) (string, []byte, error) {
+func ProcessGlob(name string, processor ProcessorFunc, errw io.Writer, pattern string) (string, []byte, error) {
 	files, err := filepath.Glob(pattern)
 	if err != nil {
 		return "", nil, err
 	}
-	return ProcessFiles(name, processor, stderr, files...)
+	return ProcessFiles(name, processor, errw, files...)
 }
 
-func ProcessFiles(name string, processor ProcessorFunc, stderr io.Writer, files ...string) (string, []byte, error) {
+func ProcessFiles(name string, processor ProcessorFunc, errw io.Writer, files ...string) (string, []byte, error) {
 	buf := bytes.NewBuffer(make([]byte, 0, 1024))
 	hash, err := concatAndHash(buf, files...)
 	if err != nil {
@@ -232,10 +232,10 @@ func ProcessFiles(name string, processor ProcessorFunc, stderr io.Writer, files 
 		processor = defaultProcessor
 	}
 	outbuf := bytes.NewBuffer(make([]byte, 0, 1024))
-	if stderr == nil {
-		stderr = ioutil.Discard
+	if errw == nil {
+		errw = ioutil.Discard
 	}
-	err = processor(outbuf, buf, stderr)
+	err = processor(outbuf, buf, errw)
 	if err != nil {
 		return "", nil, err
 	}

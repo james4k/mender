@@ -1,5 +1,4 @@
-mender
-======
+# mender
 
 Simple tool for versioning and processing Javascript and CSS.
 

@@ -11,7 +11,7 @@ import (
 )
 
 func TestWatchHandler(t *testing.T) {
-	h := LiveServer("testdata/mend.json", "testdata", nil, nil)
+	h := Watch("testdata/mend.json", "testdata", nil, nil)
 	srv := httptest.NewServer(h)
 	defer srv.Close()
 
