@@ -9,14 +9,14 @@ import (
 )
 
 func TestBuildAndVersionMap(t *testing.T) {
-	vmap, err := Build("testdata/mend.json", "testdata/mend-versions.json", "testdata/_build", os.Stderr)
+	m, err := Build("testdata/mend.json", "testdata/mend-versions.json", "testdata/_build", os.Stderr)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	checkResults(t, vmap)
-	vmap = VersionMap("testdata/mend-versions.json")
-	checkResults(t, vmap)
+	checkResults(t, m)
+	m = ParseVersions("testdata/mend-versions.json").(versions).m
+	checkResults(t, m)
 
 	err = os.RemoveAll("testdata/_build")
 	if err != nil {
@@ -24,11 +24,11 @@ func TestBuildAndVersionMap(t *testing.T) {
 	}
 }
 
-func checkResults(t *testing.T, vmap map[string]string) {
-	if len(vmap) == 0 {
+func checkResults(t *testing.T, m map[string]string) {
+	if len(m) == 0 {
 		t.Fatal("no versioning info")
 	}
-	for k, v := range vmap {
+	for k, v := range m {
 		actual, err := ioutil.ReadFile(filepath.Join("testdata/_build", v))
 		if err != nil {
 			t.Fatal(err)

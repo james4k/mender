@@ -1,3 +1,5 @@
+// +build !appengine
+
 package mender
 
 import (
@@ -13,124 +15,105 @@ import (
 	"code.google.com/p/go.exp/fsnotify"
 )
 
-type Handler struct {
-	mu       sync.RWMutex
-	specfile string
-	dir      string
-	fallback http.Handler
-	vmap     map[string]string
-	data     map[string][]byte
-	stderr   io.Writer
-	logger   *log.Logger
-	OnChange func() // called when new changes are found on disk
+// Watcher is an HTTP handler which watches for changes and serves the
+// processed assets from memory. Nothing is written to disk. This is
+// intended for use during development, and niceties such as a cache of
+// old versions are not provided. Provide a Writer to get stderr output
+// from the processors.
+type Watcher struct {
+	mu     sync.RWMutex
+	data   map[string][]byte
+	logger *log.Logger
+
+	SpecFile  string
+	Dir       string
+	Fallback  http.Handler
+	LogWriter io.Writer
 }
 
-// Watch returns an HTTP handler which watches for changes and serves the
-// processed assets from memory. Nothing is written to disk. This is intended
-// for use during development, and niceties such as a cache of old versions are
-// not provided. Provide a Writer to get stderr output from the processors.
-func Watch(specfile, dir string, fallback http.Handler, stderr io.Writer) *Handler {
-	if stderr == nil {
-		stderr = ioutil.Discard
-	}
-	h := &Handler{
-		specfile: specfile,
-		dir:      dir,
-		fallback: fallback,
-		stderr:   stderr,
-		logger:   log.New(stderr, "", log.LstdFlags),
-	}
-	go func() {
-		h.mend()
-		time.AfterFunc(time.Second/5, func() {
-			h.OnChange()
-		})
-		h.watch()
-	}()
-	return h
-}
-
-func (h *Handler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	h.mu.RLock()
-	for k, v := range h.vmap {
-		if req.URL.Path == "/"+v {
-			w.Header().Set("Content-Type", mime.TypeByExtension(filepath.Ext(k)))
-			w.Write(h.data[k])
-			h.mu.RUnlock()
-			return
-		}
-	}
-	h.mu.RUnlock()
-	if h.fallback != nil {
-		h.fallback.ServeHTTP(w, req)
-	}
-}
-
-// VersionMap returns the latest versioned asset names. Useful from
-// Handler.OnChange
-func (h *Handler) VersionMap() map[string]string {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	return h.vmap
-}
-
-func (h *Handler) log(s interface{}) {
-	h.logger.Println(s)
-}
-
-func (h *Handler) watch() {
-	specs, err := ReadSpecs(h.specfile)
-	if err != nil {
-		h.log(err)
+func (w *Watcher) lazyInit() {
+	if w.logger != nil {
 		return
 	}
+	if w.LogWriter == nil {
+		w.LogWriter = ioutil.Discard
+	}
+	w.logger = log.New(w.LogWriter, "", log.LstdFlags)
+	w.mend()
+	go w.watch()
+}
 
+func (w *Watcher) Version(s string) string {
+	w.lazyInit()
+	return s
+}
+
+func (w *Watcher) ServeHTTP(writer http.ResponseWriter, req *http.Request) {
+	w.lazyInit()
+	w.mu.RLock()
+	k := req.URL.Path[1:]
+	v, ok := w.data[k]
+	if ok {
+		writer.Header().Set("Content-Type", mime.TypeByExtension(filepath.Ext(k)))
+		writer.Write(v)
+		w.mu.RUnlock()
+		return
+	}
+	w.mu.RUnlock()
+	if w.Fallback != nil {
+		w.Fallback.ServeHTTP(writer, req)
+	}
+}
+
+func (w *Watcher) log(s interface{}) {
+	w.logger.Println(s)
+}
+
+func (w *Watcher) watch() {
+	specs, err := ReadSpecs(w.SpecFile)
+	if err != nil {
+		w.log(err)
+		return
+	}
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
-		h.log(err)
+		w.log(err)
 		return
 	}
 	defer watcher.Close()
-
-	watcher.Watch(h.specfile)
+	watcher.Watch(w.SpecFile)
 	for _, s := range specs {
 		for _, f := range s.Files {
-			watcher.Watch(filepath.Join(h.dir, f))
+			watcher.Watch(filepath.Join(w.Dir, f))
 		}
 	}
-
 	select {
 	case <-watcher.Event:
 	case err := <-watcher.Error:
-		h.log(err)
+		w.log(err)
 		return
 	}
-	time.Sleep(time.Second / 10)
-
-	h.mend()
-	h.OnChange()
-	go h.watch()
+	time.Sleep(100 * time.Millisecond)
+	w.mend()
+	go w.watch()
 }
 
-func (h *Handler) mend() {
-	specs, err := ReadSpecs(h.specfile)
+func (w *Watcher) mend() {
+	specs, err := ReadSpecs(w.SpecFile)
 	if err != nil {
-		h.log(err)
+		w.log(err)
 		return
 	}
-	vmap := make(map[string]string, len(specs))
 	data := make(map[string][]byte, len(specs))
 	for _, s := range specs {
-		vname, d, err := ProcessSpec(s, h.dir, h.stderr)
+		_, d, err := ProcessSpec(s, w.Dir, w.LogWriter)
 		if err != nil {
-			h.log(err)
+			w.log(err)
 			return
 		}
-		vmap[s.Name] = vname
 		data[s.Name] = d
 	}
-	h.mu.Lock()
-	h.vmap = vmap
-	h.data = data
-	h.mu.Unlock()
+	w.mu.Lock()
+	w.data = data
+	w.mu.Unlock()
 }

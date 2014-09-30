@@ -11,12 +11,16 @@ import (
 )
 
 func TestWatchHandler(t *testing.T) {
-	h := Watch("testdata/mend.json", "testdata", nil, nil)
+	h := &Watcher{
+		SpecFile: "testdata/mend.json",
+		Dir:      "testdata",
+	}
 	srv := httptest.NewServer(h)
 	defer srv.Close()
 
-	for k, name := range h.VersionMap() {
-		resp, err := http.Get(srv.URL + "/" + path.Clean(name))
+	h.lazyInit()
+	for k := range h.data {
+		resp, err := http.Get(srv.URL + "/" + path.Clean(k))
 		if err != nil {
 			t.Fatal(err)
 		}

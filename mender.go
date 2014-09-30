@@ -258,18 +258,34 @@ func concatAndHash(dst io.Writer, files ...string) (uint32, error) {
 	return hash.Sum32(), nil
 }
 
-func VersionMap(vfile string) map[string]string {
-	data, err := ioutil.ReadFile(vfile)
+type Versioner interface {
+	Version(string) string
+}
+
+type versions struct {
+	m map[string]string
+}
+
+func (v versions) Version(s string) string {
+	r, ok := v.m[s]
+	if !ok {
+		return s
+	}
+	return r
+}
+
+func ParseVersions(file string) Versioner {
+	data, err := ioutil.ReadFile(file)
 	if err != nil {
 		// file probably doesn't exist, so just give zero val
 		return nil
 	}
-	vmap := make(map[string]string)
-	err = json.Unmarshal(data, &vmap)
+	m := make(map[string]string)
+	err = json.Unmarshal(data, &m)
 	if err != nil {
 		// panics used as this is func is commonly called for package-scope vars,
 		// and there was something wrong with the json formatting...
 		panic(err)
 	}
-	return vmap
+	return versions{m: m}
 }
