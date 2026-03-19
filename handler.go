@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	"code.google.com/p/go.exp/fsnotify"
+	"github.com/fsnotify/fsnotify"
 )
 
 // Watcher is an HTTP handler which watches for changes and serves the
@@ -81,15 +81,15 @@ func (w *Watcher) watch() {
 		return
 	}
 	defer watcher.Close()
-	watcher.Watch(w.SpecFile)
+	watcher.Add(w.SpecFile)
 	for _, s := range specs {
 		for _, f := range s.Files {
-			watcher.Watch(filepath.Join(w.Dir, f))
+			watcher.Add(filepath.Join(w.Dir, f))
 		}
 	}
 	select {
-	case <-watcher.Event:
-	case err := <-watcher.Error:
+	case <-watcher.Events:
+	case err := <-watcher.Errors:
 		w.log(err)
 		return
 	}

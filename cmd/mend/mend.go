@@ -6,7 +6,7 @@ import (
 	"log"
 	"os"
 
-	"j4k.co/mender"
+	"github.com/james4k/mender"
 )
 
 func main() {
